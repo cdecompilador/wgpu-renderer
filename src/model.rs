@@ -1,23 +1,31 @@
 use wgpu::util::DeviceExt;
+use cgmath::{Vector3, Matrix4};
 
 use crate::mesh::Mesh;
+use crate::uniform::{Uniform, UniformDataType};
 
-pub struct Model<'a> {
-    mesh: Mesh<'a>,
+pub struct Model {
+    mesh: Mesh,
     render_info: RenderInfo,
 }
 
-impl<'a> Model<'a> {
-    pub fn new(device: &wgpu::Device, mesh: Mesh<'a>) -> Self {
+impl Model {
+    pub fn new(
+        device: &wgpu::Device,
+        mesh: Mesh
+    ) -> Self {
         Self {
             render_info: RenderInfo::new(device, &mesh),
             mesh,
         }
     }
 
-    pub fn render(&'a self, render_pass: &mut wgpu::RenderPass<'a>) {
-        self.render_info
-            .render(self.mesh.indices_count(), render_pass);
+    pub fn render<'a>(
+        &'a self,
+        queue: &wgpu::Queue,
+        render_pass: &mut wgpu::RenderPass<'a>
+    ) {
+        self.render_info.render(self.mesh.indices_count(), render_pass);
     }
 }
 
@@ -27,7 +35,10 @@ pub struct RenderInfo {
 }
 
 impl RenderInfo {
-    pub fn new(device: &wgpu::Device, mesh: &Mesh) -> Self {
+    pub fn new(
+        device: &wgpu::Device,
+        mesh: &Mesh
+    ) -> Self {
         Self {
             vertex_buffer: device.create_buffer_init(
                 &wgpu::util::BufferInitDescriptor {
@@ -60,9 +71,21 @@ impl RenderInfo {
     }
 }
 
-struct ModelUniform {
-    model_transform: [[f32; 4]; 4],
-    buffer: wgpu::Buffer,
-    bind_group: wgpu::BindGroup,
-    bind_group_layout: wgpu::BindGroupLayout,
+pub struct ModelUniform {
+    uniform: Uniform<cgmath::Matrix4<f32>>
+}
+
+impl From<Uniform<Matrix4<f32>>> for ModelUniform {
+    fn from(uniform: Uniform<Matrix4<f32>>) -> Self {
+        Self {
+            uniform
+        }
+    }
+}
+
+impl ModelUniform {
+    pub fn update(&self, queue: &wgpu::Queue, position: Vector3<f32>) {
+        let transform = Matrix4::from_translation(position);
+        self.uniform.update(queue, transform);
+    }
 }

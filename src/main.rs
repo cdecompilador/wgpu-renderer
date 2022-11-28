@@ -1,10 +1,11 @@
-use std::mem;
 use std::path::Path;
 use std::time::Instant;
 
 use anyhow::*;
 use camera::CameraController;
-use mouse_input::MouseInput;
+use cgmath::Vector3;
+use model::ModelUniform;
+use wgpu::TextureView;
 use winit::dpi::PhysicalSize;
 use winit::event::*;
 use winit::event_loop::{ControlFlow, EventLoop};
@@ -19,28 +20,32 @@ mod mouse_input;
 use crate::camera::{Camera, CameraUniform};
 use crate::mesh::{Mesh, VERTEX_DESC};
 use crate::model::Model;
+use crate::uniform::{UniformGroup, UniformGroupBuilder};
 
 type Position = cgmath::Vector3<f32>;
 
 /// Renderer for a specific model, can render that model at multiple places
-pub struct ModelRenderer<'a> {
+pub struct ModelRenderer {
     /// The specific model
-    model: Option<Model<'a>>,
+    model: Option<Model>,
+
+    model_uniform: ModelUniform,
 
     /// The instances of those models, with a fixed position
     instances: Vec<Position>,
 }
 
-impl<'a> ModelRenderer<'a> {
+impl ModelRenderer {
     /// Create the model renderer, that renders a certain model
-    pub fn new(model: Model<'a>) -> Self {
+    pub fn new(model_uniform: ModelUniform, model: Model) -> Self {
         Self {
             model: Some(model),
+            model_uniform,
             instances: vec![Position::new(0.0, 0.0, 0.0)],
         }
     }
 
-    pub fn replace_model(&mut self, new_model: Model<'a>) {
+    pub fn replace_model(&mut self, new_model: Model) {
         self.model.replace(new_model);
     }
 
@@ -48,36 +53,103 @@ impl<'a> ModelRenderer<'a> {
         self.instances.push(position);
     }
 
-    pub fn render(&'a mut self, render_pass: &mut wgpu::RenderPass<'a>) {
-        let mut model = self.model.as_mut().unwrap();
+    pub fn render<'a>(
+        &'a mut self,
+        queue: &wgpu::Queue,
+        render_pass: &mut wgpu::RenderPass<'a>
+    ) {
+        let model = self.model.as_ref().unwrap();
         for instance in &self.instances {
-            // model.set_instance(instance);
-            model.render(render_pass);
+            self.model_uniform.update(queue, instance.clone());
+            model.render(queue, render_pass);
         }
     }
 }
 
-pub struct MasterRenderer<'a> {
-    model_renderer: ModelRenderer<'a>,
+pub struct MasterRenderer {
+    /// Color used to clear the screen
     clear_color: wgpu::Color,
+
+    /// Attached to a render pass is the programable process the data to be
+    /// drawn goes through
+    pipeline: ModelPipeline,
+
+    m1: Model,
+    m2: Model,
 }
 
-impl<'a> MasterRenderer<'a> {
-    pub fn new(context: &WgpuContext) -> Self {
-        Self {
-            model_renderer: ModelRenderer::new(
-                Model::new(
-                    context.device(),
-                    Mesh::QUAD
-                )
-            ),
+impl MasterRenderer {
+    pub fn new(
+        device: &wgpu::Device,
+        format: wgpu::TextureFormat,
+    ) -> Result<Self> {
+
+        Ok(Self {
             clear_color: wgpu::Color {
                 r: 0.1,
                 g: 0.2,
                 b: 0.4,
                 a: 1.0
-            }
-        }
+            },
+            pipeline: ModelPipeline::new(
+                &device,
+                format,
+            )?,
+            m1: Model::new(device, Mesh::QUAD),
+            m2: Model::new(device, Mesh::TRIANGLE)
+        })
+    }
+
+    pub fn render<'a>(
+        &'a mut self,
+        queue: &wgpu::Queue,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &TextureView
+    ) {
+        
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("Render pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(
+                        self.clear_color()
+                    ),
+                    store: true,
+                },
+            })],
+            depth_stencil_attachment: None,
+        });
+
+        self.pipeline.set_current(&mut render_pass);
+        self.m2.render(queue, &mut render_pass);
+        drop(render_pass);
+
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("Render pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Load,
+                    store: true,
+                },
+            })],
+            depth_stencil_attachment: None,
+        });
+
+        self.pipeline.set_current(&mut render_pass);
+        self.m1.render(queue, &mut render_pass);
+        drop(render_pass);
+    }
+
+    pub fn clear_color(&self) -> wgpu::Color {
+        self.clear_color
+    }
+    
+    pub fn update_uniforms(&mut self, queue: &wgpu::Queue, camera: &Camera) {
+        self.pipeline.update_uniforms(queue, camera);
     }
 }
 
@@ -94,12 +166,7 @@ pub struct WgpuContext {
     /// physical device
     queue: wgpu::Queue,
 
-    /// Attached to a render pass is the programable process the data to be
-    /// drawn goes through
-    pipeline: Pipeline,
-
-    /// Color used to clear the screen
-    clear_color: wgpu::Color,
+    master_renderer: MasterRenderer,
 }
 
 impl WgpuContext {
@@ -108,19 +175,15 @@ impl WgpuContext {
         queue: wgpu::Queue,
         format: wgpu::TextureFormat
     ) -> Result<Self> {
-        // Create the render pipeline
-        let pipeline = Pipeline::new(&device, format, ".\\src\\shader.wgsl")?;
+        // Create the render pipeline and the uniforms, the camera must be 
+        // owned by the pipeline, with the others we can do whatever we want
+
+        let master_renderer = MasterRenderer::new(&device, format)?;
 
         Ok(Self {
             device,
             queue,
-            pipeline,
-            clear_color: wgpu::Color {
-                r: 0.1,
-                g: 0.2,
-                b: 0.3,
-                a: 1.0,
-            },
+            master_renderer
         })
     }
 
@@ -132,85 +195,87 @@ impl WgpuContext {
         surface.configure(&self.device, config);
     }
     
-    pub fn render(&mut self, view: &wgpu::TextureView) -> Result<()> {
+    pub fn render<'a>(&'a mut self, view: &'a wgpu::TextureView) -> Result<()> {
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("Render Encoder"),
             });
 
-        let model = Model::new(&self.device, Mesh::QUAD);
-        {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Render pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(self.clear_color),
-                        store: true,
-                    },
-                })],
-                depth_stencil_attachment: None,
-            });
+        self.master_renderer.render(&self.queue, &mut encoder, view);
 
-            self.pipeline.set_current(&mut render_pass);
-            model.render(&mut render_pass);
-        }
-
-        self.queue.submit(std::iter::once(encoder.finish()));
+        // self.queue.submit(std::iter::once(encoder.finish()));
 
         Ok(())
     }
 
     pub fn update(&mut self, camera: &Camera) {
-        self.pipeline.camera_uniform.update_view_proj(&self.queue, camera);
+        self.master_renderer.update_uniforms(&self.queue, camera);
+    }
+}
+
+pub struct ModelPipeline {
+    pipeline: Pipeline,
+    camera_uniform: CameraUniform,
+    model_uniform: ModelUniform,
+}
+
+impl ModelPipeline {
+    pub fn new(
+        device: &wgpu::Device,
+        format: wgpu::TextureFormat,
+    ) -> Result<Self> {
+        // Create the shader module
+        let shader = device.create_shader_module(
+            wgpu::include_wgsl!("shader.wgsl")
+        );
+
+        // Create the uniform group and the uniforms
+        let mut builder = UniformGroupBuilder::new(&device);
+        let camera_uniform = CameraUniform::from(
+            builder.create_uniform(wgpu::ShaderStages::VERTEX)
+        );
+        let model_uniform = ModelUniform::from(
+            builder.create_uniform(wgpu::ShaderStages::VERTEX)
+        );
+        let uniform_group = builder.build();
+
+        Ok(Self {
+            pipeline: Pipeline::new(device, format, uniform_group, shader)?,
+            camera_uniform,
+            model_uniform
+        })
     }
 
-    pub fn queue<'a>(&'a self) -> &'a wgpu::Queue {
-        &self.queue
+    pub fn set_current<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>) {
+        self.pipeline.set_current(render_pass);
     }
 
-    pub fn device<'a>(&'a self) -> &'a wgpu::Device {
-        &self.device
+    pub fn update_uniforms(&mut self, queue: &wgpu::Queue, camera: &Camera) {
+        self.camera_uniform.update_view_proj(queue, camera);
     }
 }
 
 pub struct Pipeline {
     shader: wgpu::ShaderModule,
     pipeline: wgpu::RenderPipeline,
-    pub camera_uniform: CameraUniform,
+    uniform_group: UniformGroup,
 }
 
 impl Pipeline {
     pub fn new(
         device: &wgpu::Device,
         format: wgpu::TextureFormat,
-        shader_source_path: impl AsRef<Path>,
+        uniform_group: UniformGroup,
+        shader: wgpu::ShaderModule,
     ) -> Result<Self> {
-        // Create the camera uniform
-        let mut camera_uniform = CameraUniform::new(device);
-
-        // Load the source from the path
-        let shader_source = std::fs::read_to_string(shader_source_path.as_ref())
-            .context("Failed to read the shader path")?;
-
-        // Create the shader module
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some(&format!(
-                "Shader: {}",
-                shader_source_path.as_ref().display()
-            )),
-            source: wgpu::ShaderSource::Wgsl(shader_source.into()),
-        });
-
         // Create the pipeline and add its bind groups, the shader must have
         // fixed entry point names
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
                 bind_group_layouts: &[
-                    camera_uniform.bind_group_layout()
+                    uniform_group.bind_group_layout(),
                 ],
                 push_constant_ranges: &[],
             });
@@ -252,13 +317,13 @@ impl Pipeline {
         Ok(Self {
             shader,
             pipeline,
-            camera_uniform
+            uniform_group,
         })
     }
     
     pub fn set_current<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>) {
         render_pass.set_pipeline(&self.pipeline);
-        render_pass.set_bind_group(0, self.camera_uniform.bind_group(), &[]);
+        render_pass.set_bind_group(0, self.uniform_group.bind_group(), &[]);
     }
 }
 

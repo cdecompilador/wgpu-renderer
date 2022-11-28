@@ -1,11 +1,11 @@
 use std::mem;
 
-pub struct Mesh<'a> {
-    vertices: &'a [Vertex],
-    indices: &'a [u16],
+pub struct Mesh {
+    vertices: &'static [Vertex],
+    indices: &'static [u16],
 }
 
-impl<'a> Mesh<'a> {
+impl Mesh {
     pub const QUAD: Self = Mesh {
         vertices: &[
             Vertex::new([-0.5, 0.5, 0.0], [1.0, 0.0, 0.0]),
@@ -29,7 +29,7 @@ impl<'a> Mesh<'a> {
         self.indices.len() as u32
     }
 
-    pub fn vertex_data(&'a self) -> &'a [u8] {
+    pub fn vertex_data<'a>(&'a self) -> &'a [u8] {
         unsafe {
             std::slice::from_raw_parts(
                 self.vertices.as_ref().as_ptr() as *const u8,
@@ -38,7 +38,7 @@ impl<'a> Mesh<'a> {
         }
     }
 
-    pub fn index_data(&'a self) -> &'a [u8] {
+    pub fn index_data<'a>(&'a self) -> &'a [u8] {
         unsafe {
             std::slice::from_raw_parts(
                 self.indices.as_ref().as_ptr() as *const u8,

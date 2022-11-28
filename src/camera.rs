@@ -1,6 +1,10 @@
-use cgmath::{Point3, Matrix4, Vector3, Rad, Deg, InnerSpace, Perspective, num_traits::bounds::LowerBounded, Bounded};
+use cgmath::{
+    Point3, Matrix4, Vector3, Rad, Deg, Bounded
+};
 use winit::event::*;
-use crate::{mouse_input::{MouseInput, self}, uniform::{Uniform, UniformDataType}};
+
+use crate::mouse_input::MouseInput;
+use crate::uniform::Uniform;
 
 const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
     1.0, 0.0, 0.0, 0.0,
@@ -140,6 +144,7 @@ pub struct CameraController {
     speed: f32,
     sensitivity: f32,
     mouse_input: Option<MouseInput>,
+    grab_mouse: bool,
     forward: bool,
     backward: bool,
     left: bool,
@@ -154,6 +159,7 @@ impl CameraController {
             speed,
             sensitivity,
             mouse_input: None,
+            grab_mouse: false,
             forward: false,
             backward: false,
             left: false,
@@ -181,6 +187,11 @@ impl CameraController {
                     VirtualKeyCode::D => self.right = is_pressed,
                     VirtualKeyCode::Q => self.up = is_pressed,
                     VirtualKeyCode::E => self.down = is_pressed,
+                    VirtualKeyCode::L => {
+                        if is_pressed {
+                            self.grab_mouse = !self.grab_mouse;
+                        }
+                    },
                     VirtualKeyCode::Space => self.up = is_pressed,
                     VirtualKeyCode::LShift => self.down = is_pressed,
                     _ => {
@@ -206,6 +217,10 @@ impl CameraController {
     }
 
     pub fn update_camera(&mut self, camera: &mut Camera, dt: f32) {
+        if !self.grab_mouse {
+            return;
+        }
+
         // Calculate the vector that points towards the scene and to the right
         let (forward, right) = camera.calc_dirs();
         let step = self.speed * dt;
@@ -254,25 +269,15 @@ pub struct CameraUniform {
     uniform: Uniform<Matrix4<f32>>
 }
 
-impl CameraUniform {
-    pub fn new(device: &wgpu::Device) -> Self {
+impl From<Uniform<Matrix4<f32>>> for CameraUniform {
+    fn from(uniform: Uniform<Matrix4<f32>>) -> Self {
         Self {
-            uniform: Matrix4::create_uniform(
-                0,
-                wgpu::ShaderStages::VERTEX,
-                device
-            )
+            uniform
         }
     }
-    
-    pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
-        self.uniform.bind_group_layout()
-    }
+}
 
-    pub fn bind_group(&self) -> &wgpu::BindGroup {
-        self.uniform.bind_group()
-    }
-
+impl CameraUniform {
     pub fn update_view_proj(&mut self, queue: &wgpu::Queue, camera: &Camera) {
         let view_proj_data = camera.calc_matrix().into();
         self.uniform.update(queue, view_proj_data);
