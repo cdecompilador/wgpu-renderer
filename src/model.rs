@@ -2,7 +2,7 @@ use wgpu::util::DeviceExt;
 use cgmath::{Vector3, Matrix4};
 
 use crate::mesh::Mesh;
-use crate::uniform::{Uniform, UniformDataType};
+use crate::uniform::Uniform;
 
 pub struct Model {
     mesh: Mesh,
@@ -22,7 +22,6 @@ impl Model {
 
     pub fn render<'a>(
         &'a self,
-        queue: &wgpu::Queue,
         render_pass: &mut wgpu::RenderPass<'a>
     ) {
         self.render_info.render(self.mesh.indices_count(), render_pass);

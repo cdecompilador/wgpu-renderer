@@ -1,22 +1,13 @@
 use std::cell::Cell;
-use std::any::{TypeId, Any};
-use std::collections::HashMap;
 use std::rc::Rc;
 
 use wgpu::util::DeviceExt;
 use cgmath::{Matrix4, SquareMatrix};
 
-#[derive(Clone, Copy)]
-pub struct UniformInfo {
-    pub binding: u32,
-    pub visibility: wgpu::ShaderStages
-}
-
 pub trait UniformDataType: Sized + Copy {
     fn initial_value() -> Self;
 
     fn create_uniform(
-        info: UniformInfo,
         device: &wgpu::Device
     ) -> Uniform<Self> {
         let data = Self::initial_value();
@@ -103,6 +94,69 @@ impl<'a> UniformGroupBuilder<'a> {
         }
     }
 
+    #[allow(dead_code)]
+    pub fn register_texture(
+        &mut self,
+        view: &wgpu::TextureView,
+        sampler: &wgpu::Sampler
+    ) {
+        // Create the bindings
+        let texture_binding = self.get_binding();
+        let sampler_binding = self.get_binding();
+
+        // Generate the information to later instantiate the full bind group
+        self.layout_entries.push(
+            wgpu::BindGroupLayoutEntry {
+                binding: texture_binding,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Texture {
+                    multisampled: false,
+                    view_dimension: wgpu::TextureViewDimension::D2,
+                    sample_type: wgpu::TextureSampleType::Float {
+                        filterable: true
+                    }
+                },
+                count: None,
+            }
+        );
+        self.layout_entries.push(
+            wgpu::BindGroupLayoutEntry {
+                binding: sampler_binding,
+                visibility: wgpu::ShaderStages::FRAGMENT,
+                ty: wgpu::BindingType::Sampler(
+                    wgpu::SamplerBindingType::Filtering
+                ),
+                count: None,
+            }
+        );
+        self.entries.push(
+            wgpu::BindGroupEntry {
+                binding: texture_binding,
+                resource: unsafe {
+                    std::mem::transmute::<
+                        wgpu::BindingResource<'_>,
+                        wgpu::BindingResource<'static>
+                    >(
+                        wgpu::BindingResource::TextureView(view)
+                    )
+                }
+            }
+        );
+        self.entries.push(
+            wgpu::BindGroupEntry {
+                binding: sampler_binding,
+                resource: unsafe {
+                    std::mem::transmute::<
+                        wgpu::BindingResource<'_>,
+                        wgpu::BindingResource<'static>
+                    >(
+                        wgpu::BindingResource::Sampler(sampler)
+                    )
+                }
+            }
+        );
+    }
+
     pub fn create_uniform<DT>(
         &mut self,
         visibility: wgpu::ShaderStages
@@ -114,18 +168,14 @@ impl<'a> UniformGroupBuilder<'a> {
         let binding = self.get_binding();
 
         // Instantiate the uniform and save it
-        let info = UniformInfo {
-            binding,
-            visibility,
-        };
-        let uniform = DT::create_uniform(info, self.device);
+        let uniform = DT::create_uniform(self.device);
         let buffer = uniform.buffer();
         
         // Generate the information to later instantiate the full bind group
         self.layout_entries.push(
             wgpu::BindGroupLayoutEntry {
                 binding,
-                visibility: info.visibility,
+                visibility: visibility,
                 ty: wgpu::BindingType::Buffer {
                     ty: wgpu::BufferBindingType::Uniform,
                     has_dynamic_offset: false,
@@ -137,9 +187,14 @@ impl<'a> UniformGroupBuilder<'a> {
         self.entries.push(
             wgpu::BindGroupEntry {
                 binding,
-                resource: unsafe { std::mem::transmute::<wgpu::BindingResource<'_>, wgpu::BindingResource<'static>>(
-                    buffer.as_entire_binding()
-                ) },
+                resource: unsafe { 
+                    std::mem::transmute::<
+                        wgpu::BindingResource<'_>,
+                        wgpu::BindingResource<'static>
+                    >(
+                        buffer.as_entire_binding()
+                    )
+                },
             }
         );
 
@@ -147,7 +202,6 @@ impl<'a> UniformGroupBuilder<'a> {
     }
 
     pub fn build(self) -> UniformGroup {
-        dbg!(&self.layout_entries);
         let bind_group_layout = self.device.create_bind_group_layout(
             &wgpu::BindGroupLayoutDescriptor {
                 entries: self.layout_entries.as_slice(),

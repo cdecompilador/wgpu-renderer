@@ -16,6 +16,7 @@ impl Mesh {
         indices: &[0, 1, 2, 0, 2, 3],
     };
 
+    #[allow(dead_code)]
     pub const TRIANGLE: Self = Mesh {
         vertices: &[
             Vertex::new([0.5, -0.5, 0.0], [1.0, 0.0, 0.0]),
@@ -23,6 +24,32 @@ impl Mesh {
             Vertex::new([-0.5, -0.5, 0.0], [0.0, 0.0, 1.0]),
         ],
         indices: &[0, 1, 2],
+    };
+
+    #[allow(dead_code)]
+    pub const PENTAGON: Self = Mesh {
+        vertices: &[
+            Vertex::new([-0.0868241, 0.49240386, 0.0], [0.0, 0.0, 0.0]), 
+            Vertex::new([-0.49513406, 0.06958647, 0.0], [0.0, 0.0, 0.0]),
+            Vertex::new([-0.21918549, -0.44939706, 0.0], [0.0, 0.0, 0.0]), 
+            Vertex::new([0.35966998, -0.3473291, 0.0], [0.0, 0.0, 0.0]),
+            Vertex::new([0.44147372, 0.2347359, 0.0], [0.0, 0.0, 0.0]),
+        ],
+        indices:  &[0, 1, 4,
+                    1, 2, 4,
+                    2, 3, 4]
+    };
+
+    pub const WEIRD: Self = Mesh {
+        vertices: &[
+            Vertex::new([-0.5, -0.5, 0.0], [1.0, 0.0, 0.0]),
+            Vertex::new([0.0,  -0.5, 0.0], [0.0, 1.0, 0.0]),
+            Vertex::new([-0.5, 0.0, 0.0], [0.0, 0.0, 1.0]),
+            Vertex::new([0.5, 0.5, 0.0], [1.0, 0.0, 0.0]),
+            Vertex::new([0.0,  0.5, 0.0], [0.0, 1.0, 0.0]),
+            Vertex::new([0.5, 0.0, 0.0], [0.0, 0.0, 1.0]),
+        ],
+        indices: &[0, 1, 2, 3, 4, 5]
     };
 
     pub fn indices_count(&self) -> u32 {
@@ -62,8 +89,8 @@ pub const VERTEX_DESC: wgpu::VertexBufferLayout<'static> =
                 offset: mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
                 shader_location: 1,
                 format: wgpu::VertexFormat::Float32x3,
-            },
-        ],
+            }
+        ]
     };
 
 #[repr(C)]
@@ -75,25 +102,9 @@ struct Vertex {
 
 impl Vertex {
     const fn new(position: [f32; 3], color: [f32; 3]) -> Self {
-        Self { position, color }
-    }
-
-    fn desc<'a>() -> wgpu::VertexBufferLayout<'a> {
-        wgpu::VertexBufferLayout {
-            array_stride: mem::size_of::<Vertex>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &[
-                wgpu::VertexAttribute {
-                    offset: 0,
-                    shader_location: 0,
-                    format: wgpu::VertexFormat::Float32x3,
-                },
-                wgpu::VertexAttribute {
-                    offset: mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
-                    shader_location: 1,
-                    format: wgpu::VertexFormat::Float32x3,
-                },
-            ],
+        Self { 
+            position,
+            color,
         }
     }
 }
