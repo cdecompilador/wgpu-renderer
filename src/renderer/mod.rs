@@ -6,6 +6,7 @@ use crate::mesh::Mesh;
 use crate::camera::Camera;
 
 mod model_renderer;
+mod quad_renderer;
 
 pub use model_renderer::ModelRenderer;
 

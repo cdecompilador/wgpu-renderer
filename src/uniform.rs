@@ -1,15 +1,14 @@
-use std::cell::Cell;
 use std::rc::Rc;
 
 use wgpu::util::DeviceExt;
 use cgmath::{Matrix4, SquareMatrix};
 
-pub trait UniformDataType: Sized + Copy {
+pub trait UniformDataType: Sized {
     fn initial_value() -> Self;
 
     fn create_uniform(
         device: &wgpu::Device
-    ) -> Uniform<Self> {
+    ) -> Uniform {
         let data = Self::initial_value();
         let debug_name = Self::debug_name();
 
@@ -22,7 +21,6 @@ pub trait UniformDataType: Sized + Copy {
         );
 
         Uniform { 
-            data: Cell::new(data), 
             buffer: Rc::new(buffer), 
         }
     }
@@ -51,12 +49,30 @@ impl UniformDataType for Matrix4<f32> {
     }
 }
 
-pub struct Uniform<DT: UniformDataType> {
-    data: Cell<DT>,
+impl<const N: usize> UniformDataType for [Matrix4<f32>; N] {
+    fn initial_value() -> Self {
+        [Matrix4::identity(); N]
+    }
+
+    fn debug_name() -> &'static str {
+        "Instanced uniform"
+    }
+
+    fn as_slice<'a>(&self) -> &'a [u8] {
+        unsafe {
+            std::slice::from_raw_parts(
+                self.as_ptr() as *const u8,
+                self.len() * std::mem::size_of::<Matrix4<f32>>()
+            )
+        }
+    }
+}
+
+pub struct Uniform {
     buffer: Rc<wgpu::Buffer>,
 }
 
-impl<DT: UniformDataType> Uniform<DT> {
+impl Uniform {
     pub fn buffer(&self) -> Rc<wgpu::Buffer> {
         self.buffer.clone()
     }
@@ -160,7 +176,7 @@ impl<'a> UniformGroupBuilder<'a> {
     pub fn create_uniform<DT>(
         &mut self,
         visibility: wgpu::ShaderStages
-    ) -> Uniform<DT>
+    ) -> Uniform
     where
         DT: UniformDataType + 'static
     { 
@@ -229,9 +245,8 @@ impl<'a> UniformGroupBuilder<'a> {
     }
 }
 
-impl<DT: UniformDataType> Uniform<DT> {
-    pub fn update(&self, queue: &wgpu::Queue, data: DT) {
-        self.data.replace(data);
-        queue.write_buffer(&self.buffer, 0, self.data.get().as_slice());
+impl Uniform {
+    pub fn update<DT: UniformDataType>(&self, queue: &wgpu::Queue, data: DT) {
+        queue.write_buffer(&self.buffer, 0, data.as_slice());
     }
 }

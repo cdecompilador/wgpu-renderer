@@ -266,11 +266,11 @@ impl CameraController {
 }
 
 pub struct CameraUniform {
-    uniform: Uniform<Matrix4<f32>>
+    uniform: Uniform
 }
 
-impl From<Uniform<Matrix4<f32>>> for CameraUniform {
-    fn from(uniform: Uniform<Matrix4<f32>>) -> Self {
+impl From<Uniform> for CameraUniform {
+    fn from(uniform: Uniform) -> Self {
         Self {
             uniform
         }
@@ -279,82 +279,7 @@ impl From<Uniform<Matrix4<f32>>> for CameraUniform {
 
 impl CameraUniform {
     pub fn update_view_proj(&mut self, queue: &wgpu::Queue, camera: &Camera) {
-        let view_proj_data = camera.calc_matrix().into();
+        let view_proj_data = camera.calc_matrix();
         self.uniform.update(queue, view_proj_data);
     }
 }
-
-/*
-pub struct CameraUniform {
-    view_proj: [[f32; 4]; 4],
-    buffer: wgpu::Buffer,
-    bind_group: wgpu::BindGroup,
-    bind_group_layout: wgpu::BindGroupLayout,
-}
-
-impl CameraUniform {
-    pub fn new(device: &wgpu::Device) -> Self {
-        use cgmath::SquareMatrix;
-        use wgpu::util::DeviceExt;
-
-        let view_proj: [[f32; 4]; 4] = cgmath::Matrix4::identity().into();
-        let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Camera Buffer"),
-            contents: unsafe {
-                std::slice::from_raw_parts(
-                    view_proj.as_ref().as_ptr() as *const u8,
-                    std::mem::size_of_val(view_proj.as_ref()),
-                )
-            },
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            }],
-            label: Some("camera_bind_group_layout"),
-        });
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: buffer.as_entire_binding(),
-            }],
-            label: Some("CameraUniform::bind_group"),
-        });
-
-        Self {
-            view_proj,
-            buffer,
-            bind_group,
-            bind_group_layout,
-        }
-    }
-
-    pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
-        &self.bind_group_layout
-    }
-
-    pub fn bind_group(&self) -> &wgpu::BindGroup {
-        &self.bind_group
-    }
-
-    pub fn update_view_proj(&mut self, queue: &wgpu::Queue, camera: &Camera) {
-        self.view_proj = camera.calc_matrix().into();
-        queue.write_buffer(&self.buffer, 0, unsafe {
-            std::slice::from_raw_parts(
-                self.view_proj.as_ref().as_ptr() as *const u8,
-                std::mem::size_of_val(self.view_proj.as_ref()),
-            )
-        });
-    }
-}
-*/
-

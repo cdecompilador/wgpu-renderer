@@ -71,11 +71,11 @@ impl RenderInfo {
 }
 
 pub struct ModelUniform {
-    uniform: Uniform<cgmath::Matrix4<f32>>
+    uniform: Uniform
 }
 
-impl From<Uniform<Matrix4<f32>>> for ModelUniform {
-    fn from(uniform: Uniform<Matrix4<f32>>) -> Self {
+impl From<Uniform> for ModelUniform {
+    fn from(uniform: Uniform) -> Self {
         Self {
             uniform
         }
@@ -86,5 +86,17 @@ impl ModelUniform {
     pub fn update(&self, queue: &wgpu::Queue, position: Vector3<f32>) {
         let transform = Matrix4::from_translation(position);
         self.uniform.update(queue, transform);
+    }
+}
+
+pub struct ModelsUniform {
+    uniform: Uniform
+}
+
+impl From<Uniform> for ModelsUniform {
+    fn from(uniform: Uniform) -> Self {
+        Self {
+            uniform
+        }
     }
 }

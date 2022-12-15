@@ -1,4 +1,5 @@
 use anyhow::*;
+use cgmath::Matrix4;
 
 use super::Pipeline;
 use crate::uniform::UniformGroupBuilder;
@@ -24,10 +25,10 @@ impl ModelPipeline {
         // Create the uniform group and the uniforms
         let mut builder = UniformGroupBuilder::new(&device);
         let camera_uniform = CameraUniform::from(
-            builder.create_uniform(wgpu::ShaderStages::VERTEX)
+            builder.create_uniform::<Matrix4<f32>>(wgpu::ShaderStages::VERTEX)
         );
         let model_uniform = ModelUniform::from(
-            builder.create_uniform(wgpu::ShaderStages::VERTEX)
+            builder.create_uniform::<Matrix4<f32>>(wgpu::ShaderStages::VERTEX)
         );
         let uniform_group = builder.build();
 
