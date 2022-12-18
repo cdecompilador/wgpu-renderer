@@ -1,26 +1,32 @@
 use anyhow::*;
+use cgmath::Vector3;
 
 use crate::pipeline::ModelPipeline;
 use crate::model::Model;
-use crate::mesh::Mesh;
+use crate::mesh::{Mesh, MeshBuilder};
+use crate::chunk::{BlockPos, Chunk, Block};
 use crate::camera::Camera;
 
 mod model_renderer;
-mod quad_renderer;
+mod voxel_renderer;
 
 pub use model_renderer::ModelRenderer;
+pub use voxel_renderer::ChunkRenderer;
 
 pub struct MasterRenderer {
     /// Color used to clear the screen
     clear_color: wgpu::Color,
 
-    /// Attached to a render pass is the programable process the data to be
-    /// drawn goes through
-    m1_pipeline: ModelPipeline,
-    m2_pipeline: ModelPipeline,
+    /// The chunk data
+    /// TODO: In the future this should be outside the renderer
+    chunk: Chunk<2, 2>,
 
+    /// Renderer that can render a chunk
+    chunk_renderer: ChunkRenderer,
+
+    // Test figure just to mark the center of the world
     m1: Model,
-    m2: Model,
+    m1_pipeline: ModelPipeline,
 }
 
 impl MasterRenderer {
@@ -36,17 +42,50 @@ impl MasterRenderer {
                 b: 0.4,
                 a: 1.0
             },
+            chunk: {
+                let mut chunk = Chunk::new();
+                chunk.place_block(BlockPos::new(0, 0, 0), Block::Dirt);
+                chunk.place_block(BlockPos::new(1, 0, 0), Block::Dirt);
+                chunk.place_block(BlockPos::new(0, 1, 0), Block::Dirt);
+                chunk.place_block(BlockPos::new(1, 1, 0), Block::Dirt);
+                chunk.place_block(BlockPos::new(1, 0, 1), Block::Dirt);
+                chunk
+            },
+            chunk_renderer: ChunkRenderer::new(device, format)?,
             m1_pipeline: ModelPipeline::new(
                 device,
                 format,
             )?,
-            m2_pipeline: ModelPipeline::new(
-                device,
-                format,
-            )?,
-            m1: Model::new(device, Mesh::QUAD),
-            m2: Model::new(device, Mesh::WEIRD)
+            m1: Model::new(device, {
+                let mut builder = MeshBuilder::new();
+                builder.push(Mesh::WEIRD, BlockPos::new(0, 0, 0));
+                // builder.push(Mesh::BACK_FACE, BlockPos::new(0, 0, 0));
+                // builder.push(Mesh::RIGHT_FACE, BlockPos::new(0, 0, 0));
+                // builder.push(Mesh::LEFT_FACE, BlockPos::new(0, 0, 0));
+                // builder.push(Mesh::UP_FACE, BlockPos::new(0, 0, 0));
+                // builder.push(Mesh::DOWN_FACE, BlockPos::new(0, 0, 0));
+                // builder.push(Mesh::FRONT_FACE, BlockPos::new(1, 0, 0));
+                // builder.push(Mesh::BACK_FACE, BlockPos::new(1, 0, 0));
+                // builder.push(Mesh::RIGHT_FACE, BlockPos::new(1, 0, 0));
+                // builder.push(Mesh::LEFT_FACE, BlockPos::new(1, 0, 0));
+                // builder.push(Mesh::UP_FACE, BlockPos::new(1, 0, 0));
+                // builder.push(Mesh::DOWN_FACE, BlockPos::new(1, 0, 0));
+                // builder.push(Mesh::FRONT_FACE, BlockPos::new(1, 1, 0));
+                // builder.push(Mesh::BACK_FACE, BlockPos::new(1, 1, 0));
+                // builder.push(Mesh::RIGHT_FACE, BlockPos::new(1, 1, 0));
+                // builder.push(Mesh::LEFT_FACE, BlockPos::new(1, 1, 0));
+                // builder.push(Mesh::UP_FACE, BlockPos::new(1, 1, 0));
+                // builder.push(Mesh::DOWN_FACE, BlockPos::new(1, 1, 0));
+                builder.build()
+            }),
         })
+    }
+
+    pub fn prepare(
+        &mut self,
+        device: &wgpu::Device,
+    ) {
+        self.chunk_renderer.update_model(device, &self.chunk);
     }
 
     /// Main rendering, creates the render pass and manages the order of 
@@ -57,7 +96,6 @@ impl MasterRenderer {
         view: &wgpu::TextureView,
         depth_view: &wgpu::TextureView
     ) {
-
         // Clear
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Render pass"),
@@ -84,9 +122,8 @@ impl MasterRenderer {
         });
 
         // Draw
+        self.chunk_renderer.render(&mut render_pass);
         self.m1_pipeline.set_current(&mut render_pass);
-        self.m2.render(&mut render_pass);
-        self.m2_pipeline.set_current(&mut render_pass);
         self.m1.render(&mut render_pass);
     }
 
@@ -96,7 +133,7 @@ impl MasterRenderer {
     
     /// Update all the uniforms with refiened input in order
     pub fn update_uniforms(&mut self, queue: &wgpu::Queue, camera: &Camera) {
-        self.m1_pipeline.update_uniforms(queue, camera, cgmath::Vector3::new(0.0, 1.0, -1.0));
-        self.m2_pipeline.update_uniforms(queue, camera, cgmath::Vector3::new(0.0, 0.0, -2.0));
+        self.chunk_renderer.update_uniforms(queue, camera);
+        self.m1_pipeline.update_uniforms(queue, camera, cgmath::Vector3::new(0.0, 0.0, 0.0));
     }
 }

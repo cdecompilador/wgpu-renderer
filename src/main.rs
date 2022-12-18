@@ -15,6 +15,7 @@ mod uniform;
 mod texture;
 mod mouse_input;
 mod pipeline;
+mod chunk;
 
 use crate::texture::Texture;
 use crate::camera::Camera;
@@ -74,6 +75,9 @@ impl WgpuContext {
     
     /// Issue a render to a view (reference of a surface texture)
     pub fn render<'a>(&'a mut self, view: &'a wgpu::TextureView) -> Result<()> {
+        // Prepare the GPU buffers before rendering
+        self.master_renderer.prepare(&self.device);
+
         // Get the command encoder that will, let the master renderer and its
         // inner renderers push all its commands in order and submit them to
         // the gpu
