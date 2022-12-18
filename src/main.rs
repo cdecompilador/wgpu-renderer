@@ -72,6 +72,14 @@ impl WgpuContext {
     ) {
         surface.configure(&self.device, config);
     }
+
+    /// Resize the depth texture
+    pub fn resize_depth_texture(
+        &mut self,
+        config: &wgpu::SurfaceConfiguration
+    ) {
+        self.depth_texture = Texture::create_depth(&self.device, config);
+    }
     
     /// Issue a render to a view (reference of a surface texture)
     pub fn render<'a>(&'a mut self, view: &'a wgpu::TextureView) -> Result<()> {
@@ -192,6 +200,9 @@ impl Display {
             self.config.width = width;
             self.config.height = height;
             self.context.configure_surface(&self.surface, &self.config);
+
+            // We also have to resize the depth buffer
+            self.context.resize_depth_texture(&self.config);
         }
     }
 

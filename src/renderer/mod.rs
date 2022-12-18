@@ -19,7 +19,7 @@ pub struct MasterRenderer {
 
     /// The chunk data
     /// TODO: In the future this should be outside the renderer
-    chunk: Chunk<2, 2>,
+    chunk: Chunk<16, 16>,
 
     /// Renderer that can render a chunk
     chunk_renderer: ChunkRenderer,
@@ -44,11 +44,13 @@ impl MasterRenderer {
             },
             chunk: {
                 let mut chunk = Chunk::new();
-                chunk.place_block(BlockPos::new(0, 0, 0), Block::Dirt);
-                chunk.place_block(BlockPos::new(1, 0, 0), Block::Dirt);
-                chunk.place_block(BlockPos::new(0, 1, 0), Block::Dirt);
-                chunk.place_block(BlockPos::new(1, 1, 0), Block::Dirt);
-                chunk.place_block(BlockPos::new(1, 0, 1), Block::Dirt);
+                for x in 0..16 {
+                    for y in 0..16 {
+                        for z in 0..16 {
+                            chunk.place_block(BlockPos::new(x, y, z), Block::Dirt);
+                        }
+                    }
+                }
                 chunk
             },
             chunk_renderer: ChunkRenderer::new(device, format)?,

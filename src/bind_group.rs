@@ -99,11 +99,11 @@ impl<const N: usize> GPUDataType for [u32; N] {
 
 impl GPUDataType for &[u32] {
     fn initial_value() -> Self {
-        &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        unreachable!()
     }
 
     fn debug_name() -> &'static str {
-        "GPU u32 slice"
+        unreachable!()
     }
     
     fn as_slice<'a>(&self) -> &'a [u8] {

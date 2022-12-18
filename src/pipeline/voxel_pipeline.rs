@@ -50,7 +50,7 @@ impl VoxelPipeline {
             builder.create_uniform::<Matrix4<f32>>(wgpu::ShaderStages::VERTEX)
         );
         let faces_storage = FacesStorage::from(
-            builder.create_storage::<&[u32]>(wgpu::ShaderStages::FRAGMENT)
+            builder.create_storage::<[u32; 16 * 16 * 16]>(wgpu::ShaderStages::FRAGMENT)
         );
         let uniform_group = builder.build();
 

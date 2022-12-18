@@ -97,7 +97,7 @@ impl VoxelMesh {
     pub fn faces<'a>(&'a self) -> &'a [u32] {
         unsafe {
             std::slice::from_raw_parts(
-                self.faces.as_slice().as_ptr() as *const u32,
+                self.faces.as_ptr() as *const u32,
                 self.faces.len()
             )
         }
