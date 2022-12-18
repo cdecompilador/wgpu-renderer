@@ -5,6 +5,7 @@ use std::num::NonZeroU32;
 
 use anyhow::*;
 
+/*
 #[derive(Clone)]
 pub struct WallTexture {
     texture: Rc<Texture>
@@ -33,6 +34,7 @@ impl WallTexture {
         &self.texture.sampler
     }
 }
+*/
 
 pub struct Texture {
     pub texture: wgpu::Texture,
