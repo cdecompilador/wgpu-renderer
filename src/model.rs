@@ -2,7 +2,7 @@ use wgpu::util::DeviceExt;
 use cgmath::{Vector3, Matrix4};
 
 use crate::mesh::Mesh;
-use crate::uniform::Uniform;
+use crate::bind_group::{GPUWrite, Uniform};
 
 pub struct Model {
     mesh: Mesh,

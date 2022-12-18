@@ -3,12 +3,13 @@ use cgmath::Vector3;
 
 use crate::camera::Camera;
 use crate::chunk::{VoxelMesh, Chunk};
-use crate::pipeline::ModelPipeline;
-use crate::model::{ModelUniform, Model};
+use crate::pipeline::VoxelPipeline;
+use crate::model::Model;
 
 pub struct ChunkRenderer {
     model: Option<Model>,
-    chunk_pipeline: ModelPipeline,
+    chunk_pipeline: VoxelPipeline,
+    voxel_mesh: VoxelMesh,
 }
 
 impl ChunkRenderer {
@@ -19,7 +20,8 @@ impl ChunkRenderer {
     ) -> Result<Self> {
         Ok(Self {
             model: None,
-            chunk_pipeline: ModelPipeline::new(device, format)?
+            chunk_pipeline: VoxelPipeline::new(device, format)?,
+            voxel_mesh: VoxelMesh::new()
         })
     }
 
@@ -29,10 +31,9 @@ impl ChunkRenderer {
         device: &wgpu::Device,
         chunk: &Chunk<L, S>
     ) {
-        let mut voxel_mesh = VoxelMesh::new();
-        voxel_mesh.serialize_chunk(&chunk);
-        let mesh = voxel_mesh.mesh();
-
+        // Generate the full voxel mesh and store the new model
+        self.voxel_mesh.serialize_chunk(&chunk);
+        let mesh = self.voxel_mesh.mesh();
         self.model = Some(Model::new(device, mesh));
     }
 
@@ -41,7 +42,11 @@ impl ChunkRenderer {
         queue: &wgpu::Queue,
         camera: &Camera
     ) {
-        self.chunk_pipeline.update_uniforms(queue, camera, Vector3::new(0.0, 0.0, 0.0));
+        self.chunk_pipeline.update(
+            queue, camera,
+            Vector3::new(0.0, 0.0, 0.0),
+            self.voxel_mesh.faces()
+        );
     }
 
     /// Render all the instanced models on a single pass

@@ -1,22 +1,24 @@
 use anyhow::*;
 
-use crate::uniform::UniformGroup;
+use crate::bind_group::BindGroup;
 use crate::mesh::VERTEX_DESC;
 
 mod model_pipeline;
+mod voxel_pipeline;
 
 pub use model_pipeline::ModelPipeline;
+pub use voxel_pipeline::VoxelPipeline;
 
 pub struct Pipeline {
     pipeline: wgpu::RenderPipeline,
-    uniform_group: UniformGroup,
+    bind_group: BindGroup,
 }
 
 impl Pipeline {
     pub fn new(
         device: &wgpu::Device,
         format: wgpu::TextureFormat,
-        uniform_group: UniformGroup,
+        bind_group: BindGroup,
         shader: wgpu::ShaderModule,
     ) -> Result<Self> {
         // Create the pipeline and add its bind groups, the shader must have
@@ -25,7 +27,7 @@ impl Pipeline {
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
                 bind_group_layouts: &[
-                    uniform_group.bind_group_layout(),
+                    bind_group.bind_group_layout(),
                 ],
                 push_constant_ranges: &[],
             });
@@ -72,12 +74,12 @@ impl Pipeline {
 
         Ok(Self {
             pipeline,
-            uniform_group,
+            bind_group,
         })
     }
     
     pub fn set_current<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>) {
         render_pass.set_pipeline(&self.pipeline);
-        render_pass.set_bind_group(0, self.uniform_group.bind_group(), &[]);
+        render_pass.set_bind_group(0, self.bind_group.bind_group(), &[]);
     }
 }

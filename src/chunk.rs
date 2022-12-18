@@ -3,15 +3,15 @@ use std::fmt;
 
 use crate::mesh::{Mesh, MeshBuilder};
 
-#[repr(u8)]
+#[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Face {
-    Front,
-    Back,
-    Up,
-    Down,
-    Left,
-    Right
+    Front = 0,
+    Back  = 1,
+    Up    = 2,
+    Down  = 3,
+    Left  = 4,
+    Right = 5
 }
 
 impl Face {
@@ -45,19 +45,22 @@ impl BlockPos {
 }
 
 pub struct VoxelMesh {
-    faces: Vec<(Face, BlockPos)>
+    faces: Vec<Face>,
+    positions: Vec<BlockPos>
 }
 
 macro_rules! add_face {
-    ($face:expr, $block:expr, $faces:expr) => {
+    ($face:expr, $block:expr, $faces:expr, $positions:expr) => {
         let pos = $block.block_pos;
         let neighbor = $block.neighbor($face);
         if let Some(neighbor) = neighbor {
             if *neighbor == Block::Air {
-                $faces.push(($face, pos));
+                $faces.push($face);
+                $positions.push(pos);
             }
         } else {
-            $faces.push(($face, pos));
+            $faces.push($face);
+            $positions.push(pos);
         }
     }
 }
@@ -65,7 +68,8 @@ macro_rules! add_face {
 impl VoxelMesh {
     pub fn new() -> Self {
         Self {
-            faces: Vec::new()
+            faces: Vec::new(),
+            positions: Vec::new(),
         }
     }
 
@@ -73,26 +77,41 @@ impl VoxelMesh {
         const L: usize,
         const H: usize
     >(&mut self, chunk: &Chunk<L, H>) {
+        self.faces.clear();
+        self.positions.clear();
+
         for block in chunk.iter() {
             if *block == Block::Air {
                 continue;
             }
 
-            add_face!(Face::Front, block, self.faces);
-            add_face!(Face::Back, block, self.faces);
-            add_face!(Face::Up, block, self.faces);
-            add_face!(Face::Down, block, self.faces);
-            add_face!(Face::Left, block, self.faces);
-            add_face!(Face::Right, block, self.faces);
+            add_face!(Face::Front, block, self.faces, self.positions);
+            add_face!(Face::Back, block, self.faces, self.positions);
+            add_face!(Face::Up, block, self.faces, self.positions);
+            add_face!(Face::Down, block, self.faces, self.positions);
+            add_face!(Face::Left, block, self.faces, self.positions);
+            add_face!(Face::Right, block, self.faces, self.positions);
+        }
+    }
+
+    pub fn faces<'a>(&'a self) -> &'a [u32] {
+        unsafe {
+            std::slice::from_raw_parts(
+                self.faces.as_slice().as_ptr() as *const u32,
+                self.faces.len()
+            )
         }
     }
 
     pub fn mesh(&mut self) -> Mesh {
-        // Remove the faces that are not visible
+        // Assertions to ensure proper optimizations
+        assert_eq!(self.faces.len(), self.positions.len());
+
+        // TODO: Remove the faces that are not visible
 
         // Convert those faces to a mesh
         let mut builder = MeshBuilder::new();
-        for (face, position) in self.faces.iter() {
+        for (face, position) in self.faces.iter().zip(self.positions.iter()) {
             builder.push(face.mesh(), *position);
         }
 
@@ -301,12 +320,12 @@ mod tests {
         assert_eq!(
             mesher.faces,
             vec![
-                (Face::Front, BlockPos::new(0, 0, 0)),
-                (Face::Back, BlockPos::new(0, 0, 0)),
-                (Face::Up, BlockPos::new(0, 0, 0)),
-                (Face::Down, BlockPos::new(0, 0, 0)),
-                (Face::Left, BlockPos::new(0, 0, 0)),
-                (Face::Right, BlockPos::new(0, 0, 0))
+                Face::Front, 
+                Face::Back,  
+                Face::Up,    
+                Face::Down,  
+                Face::Left,  
+                Face::Right, 
             ]
         );
 

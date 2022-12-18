@@ -11,7 +11,7 @@ mod camera;
 mod renderer;
 mod mesh;
 mod model;
-mod uniform;
+mod bind_group;
 mod texture;
 mod mouse_input;
 mod pipeline;
