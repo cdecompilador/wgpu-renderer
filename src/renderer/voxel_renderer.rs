@@ -26,10 +26,10 @@ impl ChunkRenderer {
     }
 
     /// Change the model for a new one
-    pub fn update_model<const L: usize, const S: usize>(
+    pub fn update_model<const L: usize, const H: usize>(
         &mut self,
         device: &wgpu::Device,
-        chunk: &Chunk<L, S>
+        chunk: &Chunk<L, H>
     ) {
         // Generate the full voxel mesh and store the new model
         self.voxel_mesh.serialize_chunk(&chunk);
@@ -37,21 +37,25 @@ impl ChunkRenderer {
         self.model = Some(Model::new(device, mesh));
     }
 
-    pub fn update_uniforms(
+    pub fn update_uniforms<
+        const L: usize,
+        const H: usize
+    >(
         &mut self,
         queue: &wgpu::Queue,
-        camera: &Camera
+        camera: &Camera,
+        chunk: &Chunk<L, H>
     ) {
         self.chunk_pipeline.update(
             queue, camera,
-            Vector3::new(0.0, 0.0, 0.0),
+            chunk.translation(),
             self.voxel_mesh.faces()
         );
     }
 
     /// Render all the instanced models on a single pass
     pub fn render<'a>(
-        &'a mut self,
+        &'a self,
         render_pass: &mut wgpu::RenderPass<'a>
     ) {
         if let Some(model) = self.model.as_ref() {

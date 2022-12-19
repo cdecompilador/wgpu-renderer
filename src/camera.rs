@@ -3,7 +3,7 @@ use cgmath::{
 };
 use winit::event::*;
 
-use crate::mouse_input::MouseInput;
+use crate::mouse_input::{MouseInput, self};
 use crate::bind_group::{GPUWrite, Uniform};
 
 const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
@@ -143,7 +143,7 @@ impl Projection {
 pub struct CameraController {
     speed: f32,
     sensitivity: f32,
-    mouse_input: Option<MouseInput>,
+    mouse_input: MouseInput,
     grab_mouse: bool,
     forward: bool,
     backward: bool,
@@ -158,7 +158,7 @@ impl CameraController {
         Self {
             speed,
             sensitivity,
-            mouse_input: None,
+            mouse_input: MouseInput::default(),
             grab_mouse: false,
             forward: false,
             backward: false,
@@ -209,14 +209,11 @@ impl CameraController {
         &mut self,
         device_event: &DeviceEvent,
     ) {
-        if let Some(mouse_input) = &mut self.mouse_input {
-            mouse_input.process_mouse_input(device_event);
-        } else {
-            self.mouse_input = Some(MouseInput::default());
-        }
+        self.mouse_input.process_mouse_input(device_event);
     }
 
     pub fn update_camera(&mut self, camera: &mut Camera, dt: f32) {
+        dbg!(self.speed, &self.mouse_input);
         if !self.grab_mouse {
             return;
         }
@@ -248,20 +245,20 @@ impl CameraController {
             });
         }
 
-        if let Some(mouse_input) = self.mouse_input.take() {
-            camera.update_pitch(|angle| {
-                *angle = Rad(
-                    f32::clamp(
-                        (*angle - Rad(mouse_input.delta_y * self.sensitivity)).0,
-                        <Rad<f32> as Bounded>::min_value().0 + 0.1,
-                        <Rad<f32> as Bounded>::max_value().0 - 0.1
-                    )
+        let mouse_input = std::mem::take(&mut self.mouse_input);
+        camera.update_pitch(|angle| {
+            *angle = Rad(
+                f32::clamp(
+                    (*angle - Rad(mouse_input.delta_y * self.sensitivity)).0,
+                    <Rad<f32> as Bounded>::min_value().0 + 0.1,
+                    <Rad<f32> as Bounded>::max_value().0 - 0.1
                 )
-            });
-            camera.update_yaw(|angle| {
-                *angle -= Rad(mouse_input.delta_x * self.sensitivity)
-            });
-        }
+            )
+        });
+        camera.update_yaw(|angle| {
+            *angle -= Rad(mouse_input.delta_x * self.sensitivity)
+        });
+        self.speed += mouse_input.scroll * 10.0;
     }
 }
 

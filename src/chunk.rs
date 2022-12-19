@@ -1,6 +1,8 @@
 use std::ops::Deref;
 use std::fmt;
 
+use cgmath::Vector3;
+
 use crate::mesh::{Mesh, MeshBuilder};
 
 #[repr(u32)]
@@ -23,6 +25,21 @@ impl Face {
             Face::Down  => Mesh::DOWN_FACE,
             Face::Left  => Mesh::LEFT_FACE,
             Face::Right => Mesh::RIGHT_FACE
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ChunkPos {
+    pub x: i32,
+    pub z: i32,
+}
+
+impl ChunkPos {
+    pub fn new(x: i32, z: i32) -> Self {
+        Self {
+            x,
+            z,
         }
     }
 }
@@ -186,13 +203,15 @@ impl<'a, const L: usize, const H: usize> BlockRef<'a, L, H> {
 
 #[derive(Debug)]
 pub struct Chunk<const L: usize, const H: usize> {
-    blocks: [[[Block; L]; L]; H]
+    blocks: [[[Block; L]; L]; H],
+    chunk_pos: ChunkPos,
 }
 
 impl<const L: usize, const H: usize> Chunk<L, H> {
-    pub fn new() -> Self {
+    pub fn new(chunk_pos: ChunkPos) -> Self {
         Self {
-            blocks: [[[Block::Air; L]; L]; H]
+            blocks: [[[Block::Air; L]; L]; H],
+            chunk_pos
         }
     }
     
@@ -233,6 +252,18 @@ impl<const L: usize, const H: usize> Chunk<L, H> {
             chunk: self,
             block_pos: BlockPos::new(0, 0, 0)
         }
+    }
+
+    pub fn translation(&self) -> Vector3<f32> {
+        Vector3::new(
+            (self.chunk_pos.x * L as i32) as f32,
+            0.0,
+            (self.chunk_pos.z * H as i32) as f32,
+        )
+    }
+
+    pub fn pos(&self) -> ChunkPos {
+        self.chunk_pos
     }
 }
 
@@ -286,7 +317,7 @@ mod tests {
 
     #[test]
     fn chunk_iteration_and_access() {
-        let mut chunk: Chunk<2, 2> = Chunk::new();
+        let mut chunk: Chunk<2, 2> = Chunk::new(ChunkPos::new(0, 0));
         chunk.place_block(BlockPos::new(0, 0, 0), Block::Id(1)).unwrap();
         chunk.place_block(BlockPos::new(1, 0, 0), Block::Id(2)).unwrap();
         chunk.place_block(BlockPos::new(0, 0, 1), Block::Id(3)).unwrap();
@@ -311,7 +342,7 @@ mod tests {
 
     #[test]
     fn quad_mesh() {
-        let mut chunk: Chunk<2, 2> = Chunk::new();
+        let mut chunk: Chunk<2, 2> = Chunk::new(ChunkPos::new(0, 0));
         chunk.place_block(BlockPos::new(0, 0, 0), Block::Dirt).unwrap();
 
         let mut mesher = VoxelMesh::new();

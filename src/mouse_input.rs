@@ -2,6 +2,7 @@ use winit::event::*;
 
 #[derive(Debug, Default)]
 pub struct MouseInput {
+    pub scroll: f32,
     pub delta_x: f32,
     pub delta_y: f32,
     pub right_button: bool,
@@ -17,6 +18,11 @@ impl MouseInput {
                 self.delta_x = delta.0 as f32;
                 self.delta_y = delta.1 as f32;
             },
+            DeviceEvent::MouseWheel { 
+                delta: MouseScrollDelta::LineDelta(_, y)
+            } => {
+                self.scroll = *y;
+            }
             DeviceEvent::Button { 
                 button,
                 state: ElementState::Pressed

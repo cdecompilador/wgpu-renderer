@@ -16,10 +16,12 @@ mod texture;
 mod mouse_input;
 mod pipeline;
 mod chunk;
+mod world;
 
 use crate::texture::Texture;
 use crate::camera::Camera;
 use crate::renderer::MasterRenderer;
+use crate::world::World;
 
 /// Contains all the wgpu primitives and state
 pub struct WgpuContext {
@@ -82,9 +84,13 @@ impl WgpuContext {
     }
     
     /// Issue a render to a view (reference of a surface texture)
-    pub fn render<'a>(&'a mut self, view: &'a wgpu::TextureView) -> Result<()> {
+    pub fn render<'a>(
+        &'a mut self,
+        view: &'a wgpu::TextureView,
+        world: &mut World
+    ) -> Result<()> {
         // Prepare the GPU buffers before rendering
-        self.master_renderer.prepare(&self.device);
+        self.master_renderer.prepare(&self.device, world);
 
         // Get the command encoder that will, let the master renderer and its
         // inner renderers push all its commands in order and submit them to
@@ -108,8 +114,8 @@ impl WgpuContext {
 
     /// Update all the uniforms owned by the master renderer / his child 
     /// renderers with refined input
-    pub fn update(&mut self, camera: &Camera) {
-        self.master_renderer.update_uniforms(&self.queue, camera);
+    pub fn update(&mut self, camera: &Camera, world: &World) {
+        self.master_renderer.update_uniforms(&self.queue, camera, world.chunks());
     }
 }
 
@@ -125,6 +131,9 @@ struct Display {
 
     /// The context that will render
     context: WgpuContext,
+
+    /// The world that we will render
+    world: World,
 
     /// Camera and the controller of the camera used by the context
     camera: Camera,
@@ -189,6 +198,7 @@ impl Display {
             surface,
             config,
             context,
+            world: World::new(),
             camera,
             camera_controller: CameraController::new(1.0, 0.01),
         })
@@ -219,7 +229,7 @@ impl Display {
 
     /// Update loop, transformation from refined input, to refined state
     fn update(&mut self, dt: f32) {
-        self.context.update(&self.camera);
+        self.context.update(&self.camera, &self.world);
         self.camera_controller.update_camera(&mut self.camera, dt);
     }
 
@@ -232,7 +242,7 @@ impl Display {
             .create_view(&wgpu::TextureViewDescriptor::default());
 
         // Render to it
-        self.context.render(&view)?;
+        self.context.render(&view, &mut self.world)?;
 
         // Issue propagation of that rendering from the GPU to the OS surface
         output.present();
